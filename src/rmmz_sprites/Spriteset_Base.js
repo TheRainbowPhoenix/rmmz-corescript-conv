@@ -10,7 +10,7 @@ function Spriteset_Base() {
 Spriteset_Base.prototype = Object.create(Sprite.prototype);
 Spriteset_Base.prototype.constructor = Spriteset_Base;
 
-Spriteset_Base.prototype.initialize = function () {
+Spriteset_Base.prototype.initialize = function() {
     Sprite.prototype.initialize.call(this);
     this.setFrame(0, 0, Graphics.width, Graphics.height);
     this.loadSystemImages();
@@ -19,27 +19,27 @@ Spriteset_Base.prototype.initialize = function () {
     this._animationSprites = [];
 };
 
-Spriteset_Base.prototype.destroy = function (options) {
+Spriteset_Base.prototype.destroy = function(options) {
     this.removeAllAnimations();
     Sprite.prototype.destroy.call(this, options);
 };
 
-Spriteset_Base.prototype.loadSystemImages = function () {
+Spriteset_Base.prototype.loadSystemImages = function() {
     //
 };
 
-Spriteset_Base.prototype.createLowerLayer = function () {
+Spriteset_Base.prototype.createLowerLayer = function() {
     this.createBaseSprite();
     this.createBaseFilters();
 };
 
-Spriteset_Base.prototype.createUpperLayer = function () {
+Spriteset_Base.prototype.createUpperLayer = function() {
     this.createPictures();
     this.createTimer();
     this.createOverallFilters();
 };
 
-Spriteset_Base.prototype.update = function () {
+Spriteset_Base.prototype.update = function() {
     Sprite.prototype.update.call(this);
     this.updateBaseFilters();
     this.updateOverallFilters();
@@ -47,7 +47,7 @@ Spriteset_Base.prototype.update = function () {
     this.updateAnimations();
 };
 
-Spriteset_Base.prototype.createBaseSprite = function () {
+Spriteset_Base.prototype.createBaseSprite = function() {
     this._baseSprite = new Sprite();
     this._blackScreen = new ScreenSprite();
     this._blackScreen.opacity = 255;
@@ -55,13 +55,13 @@ Spriteset_Base.prototype.createBaseSprite = function () {
     this._baseSprite.addChild(this._blackScreen);
 };
 
-Spriteset_Base.prototype.createBaseFilters = function () {
+Spriteset_Base.prototype.createBaseFilters = function() {
     this._baseSprite.filters = [];
     this._baseColorFilter = new ColorFilter();
     this._baseSprite.filters.push(this._baseColorFilter);
 };
 
-Spriteset_Base.prototype.createPictures = function () {
+Spriteset_Base.prototype.createPictures = function() {
     const rect = this.pictureContainerRect();
     this._pictureContainer = new Sprite();
     this._pictureContainer.setFrame(rect.x, rect.y, rect.width, rect.height);
@@ -71,33 +71,33 @@ Spriteset_Base.prototype.createPictures = function () {
     this.addChild(this._pictureContainer);
 };
 
-Spriteset_Base.prototype.pictureContainerRect = function () {
+Spriteset_Base.prototype.pictureContainerRect = function() {
     return new Rectangle(0, 0, Graphics.width, Graphics.height);
 };
 
-Spriteset_Base.prototype.createTimer = function () {
+Spriteset_Base.prototype.createTimer = function() {
     this._timerSprite = new Sprite_Timer();
     this.addChild(this._timerSprite);
 };
 
-Spriteset_Base.prototype.createOverallFilters = function () {
+Spriteset_Base.prototype.createOverallFilters = function() {
     this.filters = [];
     this._overallColorFilter = new ColorFilter();
     this.filters.push(this._overallColorFilter);
 };
 
-Spriteset_Base.prototype.updateBaseFilters = function () {
+Spriteset_Base.prototype.updateBaseFilters = function() {
     const filter = this._baseColorFilter;
     filter.setColorTone($gameScreen.tone());
 };
 
-Spriteset_Base.prototype.updateOverallFilters = function () {
+Spriteset_Base.prototype.updateOverallFilters = function() {
     const filter = this._overallColorFilter;
     filter.setBlendColor($gameScreen.flashColor());
     filter.setBrightness($gameScreen.brightness());
 };
 
-Spriteset_Base.prototype.updatePosition = function () {
+Spriteset_Base.prototype.updatePosition = function() {
     const screen = $gameScreen;
     const scale = screen.zoomScale();
     this.scale.x = scale;
@@ -107,11 +107,11 @@ Spriteset_Base.prototype.updatePosition = function () {
     this.x += Math.round(screen.shake());
 };
 
-Spriteset_Base.prototype.findTargetSprite = function (/*target*/) {
+Spriteset_Base.prototype.findTargetSprite = function(/*target*/) {
     return null;
 };
 
-Spriteset_Base.prototype.updateAnimations = function () {
+Spriteset_Base.prototype.updateAnimations = function() {
     for (const sprite of this._animationSprites) {
         if (!sprite.isPlaying()) {
             this.removeAnimation(sprite);
@@ -120,8 +120,8 @@ Spriteset_Base.prototype.updateAnimations = function () {
     this.processAnimationRequests();
 };
 
-Spriteset_Base.prototype.processAnimationRequests = function () {
-    for (; ;) {
+Spriteset_Base.prototype.processAnimationRequests = function() {
+    for (;;) {
         const request = $gameTemp.retrieveAnimation();
         if (request) {
             this.createAnimation(request);
@@ -131,7 +131,7 @@ Spriteset_Base.prototype.processAnimationRequests = function () {
     }
 };
 
-Spriteset_Base.prototype.createAnimation = function (request) {
+Spriteset_Base.prototype.createAnimation = function(request) {
     const animation = $dataAnimations[request.animationId];
     const targets = request.targets;
     const mirror = request.mirror;
@@ -148,7 +148,7 @@ Spriteset_Base.prototype.createAnimation = function (request) {
 };
 
 // prettier-ignore
-Spriteset_Base.prototype.createAnimationSprite = function (
+Spriteset_Base.prototype.createAnimationSprite = function(
     targets, animation, mirror, delay
 ) {
     const mv = this.isMVAnimation(animation);
@@ -165,11 +165,11 @@ Spriteset_Base.prototype.createAnimationSprite = function (
     this._animationSprites.push(sprite);
 };
 
-Spriteset_Base.prototype.isMVAnimation = function (animation) {
+Spriteset_Base.prototype.isMVAnimation = function(animation) {
     return !!animation.frames;
 };
 
-Spriteset_Base.prototype.makeTargetSprites = function (targets) {
+Spriteset_Base.prototype.makeTargetSprites = function(targets) {
     const targetSprites = [];
     for (const target of targets) {
         const targetSprite = this.findTargetSprite(target);
@@ -180,28 +180,28 @@ Spriteset_Base.prototype.makeTargetSprites = function (targets) {
     return targetSprites;
 };
 
-Spriteset_Base.prototype.lastAnimationSprite = function () {
+Spriteset_Base.prototype.lastAnimationSprite = function() {
     return this._animationSprites[this._animationSprites.length - 1];
 };
 
-Spriteset_Base.prototype.isAnimationForEach = function (animation) {
+Spriteset_Base.prototype.isAnimationForEach = function(animation) {
     const mv = this.isMVAnimation(animation);
     return mv ? animation.position !== 3 : animation.displayType === 0;
 };
 
-Spriteset_Base.prototype.animationBaseDelay = function () {
+Spriteset_Base.prototype.animationBaseDelay = function() {
     return 8;
 };
 
-Spriteset_Base.prototype.animationNextDelay = function () {
+Spriteset_Base.prototype.animationNextDelay = function() {
     return 12;
 };
 
-Spriteset_Base.prototype.animationShouldMirror = function (target) {
+Spriteset_Base.prototype.animationShouldMirror = function(target) {
     return target && target.isActor && target.isActor();
 };
 
-Spriteset_Base.prototype.removeAnimation = function (sprite) {
+Spriteset_Base.prototype.removeAnimation = function(sprite) {
     this._animationSprites.remove(sprite);
     this._effectsContainer.removeChild(sprite);
     for (const target of sprite.targetObjects) {
@@ -212,12 +212,12 @@ Spriteset_Base.prototype.removeAnimation = function (sprite) {
     sprite.destroy();
 };
 
-Spriteset_Base.prototype.removeAllAnimations = function () {
+Spriteset_Base.prototype.removeAllAnimations = function() {
     for (const sprite of this._animationSprites.clone()) {
         this.removeAnimation(sprite);
     }
 };
 
-Spriteset_Base.prototype.isAnimationPlaying = function () {
+Spriteset_Base.prototype.isAnimationPlaying = function() {
     return this._animationSprites.length > 0;
 };

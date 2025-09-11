@@ -17,7 +17,11 @@ Window_ScrollText.prototype.initialize = function(rect) {
     this.hide();
     this._reservedRect = rect;
     this._text = "";
+    this._maxBitmapHeight = 2048;
     this._allTextHeight = 0;
+    this._blockHeight = 0;
+    this._blockIndex = 0;
+    this._scrollY = 0;
 };
 
 Window_ScrollText.prototype.update = function() {

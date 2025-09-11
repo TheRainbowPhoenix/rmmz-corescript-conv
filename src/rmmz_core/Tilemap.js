@@ -224,9 +224,9 @@ Tilemap.prototype._createLayers = function() {
      *  8 : Animation
      *  9 : Destination
      */
-    this._lowerLayer = new Tilemap.Layer();
+    this._lowerLayer = new Tilemap.CombinedLayer();
     this._lowerLayer.z = 0;
-    this._upperLayer = new Tilemap.Layer();
+    this._upperLayer = new Tilemap.CombinedLayer();
     this._upperLayer.z = 4;
     this.addChild(this._lowerLayer);
     this.addChild(this._upperLayer);

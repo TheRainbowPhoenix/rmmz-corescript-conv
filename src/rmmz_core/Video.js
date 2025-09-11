@@ -81,7 +81,7 @@ Video._createElement = function() {
     this._element.style.right = 0;
     this._element.style.bottom = 0;
     this._element.style.opacity = 0;
-    this._element.style.zIndex = 2;
+    this._element.style.zIndex = 1;
     this._element.setAttribute("playsinline", "");
     this._element.oncontextmenu = () => false;
     document.body.appendChild(this._element);
