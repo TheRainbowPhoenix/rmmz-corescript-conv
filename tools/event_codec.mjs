@@ -140,6 +140,10 @@ const serializeEventCommands = (commands) =>
 
 function renderPythonLikeCommand(c) {
   if (c.code === 108) return `# ${String(c.parameters?.[0] ?? "")}`;
+  if (c.code === 118)
+    return `label ${JSON.stringify(String(c.parameters?.[0] ?? ""))}:`;
+  if (c.code === 119)
+    return `goto(${JSON.stringify(String(c.parameters?.[0] ?? ""))})`;
   if (c.code === 111) return `if ${decodeIfCondition(c.parameters)}:`;
   if (c.code === 411) return "else:";
   if (c.code === 412) return "# end if";
@@ -150,10 +154,50 @@ function renderPythonLikeCommand(c) {
   if (c.code === 403) return "else:  # when cancel";
   if (c.code === 404) return "# end choice";
   if (c.code === 201) return renderTransferPlayer(c.parameters);
+  if (c.code === 230) return `wait(${Number(c.parameters?.[0] ?? 0)})`;
+  if (c.code === 231) return renderShowPicture(c.parameters);
+  if (c.code === 232) return renderMovePicture(c.parameters);
+  if (c.code === 235) return `erasePicture(${Number(c.parameters?.[0] ?? 0)})`;
+  if (c.code === 101) return `beginText(${JSON.stringify(c.parameters ?? [])})`;
+  if (c.code === 401)
+    return `text(${JSON.stringify(String(c.parameters?.[0] ?? ""))})`;
+  if (c.code === 102)
+    return `showChoices(${JSON.stringify(c.parameters?.[0] ?? [])})`;
+  if (c.code === 123)
+    return `SelfSwitch[${String(c.parameters?.[0] ?? "A")}] = ${Number(c.parameters?.[1] ?? 0) === 0 ? "ON" : "OFF"}`;
+  if (c.code === 250)
+    return `playSE(${JSON.stringify(c.parameters?.[0] ?? {})})`;
+  if (c.code === 355)
+    return `eval(${JSON.stringify(String(c.parameters?.[0] ?? ""))})`;
+  if (c.code === 356) return renderPluginCommand(c.parameters);
   if (c.code === 117) return renderCommonEventCall(c.parameters);
   if (c.code === 121) return renderControlSwitch(c.parameters);
   if (c.code === 122) return renderControlVariable(c.parameters);
   return null;
+}
+
+function renderPluginCommand(p) {
+  const text = String(p?.[0] ?? "");
+  if (text.startsWith("D_TEXT "))
+    return `drawText(${JSON.stringify(text.slice(7))})`;
+  if (text.startsWith("D_TEXT_SETTING "))
+    return `setTextStyle(${JSON.stringify(text.slice(15))})`;
+  if (text.startsWith("easing "))
+    return `setEasing(${JSON.stringify(text.slice(7))})`;
+  if (text.startsWith("GraphicalChoice "))
+    return `graphicalChoice(${JSON.stringify(text.slice(16))})`;
+  return `pluginCommand(${JSON.stringify(text)})`;
+}
+
+function renderShowPicture(p) {
+  const [id, name, origin, , x, y, sx, sy, opacity, blend] = p ?? [];
+  return `showPicture(id=${id}, name=${JSON.stringify(name)}, origin=${origin}, x=${x}, y=${y}, scaleX=${sx}, scaleY=${sy}, opacity=${opacity}, blend=${blend})`;
+}
+
+function renderMovePicture(p) {
+  const [id, origin, , , x, y, sx, sy, opacity, blend, duration, wait] =
+    p ?? [];
+  return `movePicture(id=${id}, origin=${origin}, x=${x}, y=${y}, scaleX=${sx}, scaleY=${sy}, opacity=${opacity}, blend=${blend}, duration=${duration}, wait=${Boolean(wait)})`;
 }
 
 function renderTransferPlayer(p) {
@@ -302,7 +346,18 @@ function toHtml(lines) {
         return `<span style="color:gray">${esc(line)}</span>`;
       const tabs = (line.match(/^\t*/) ?? [""])[0].length;
       const rest = line.slice(tabs);
-      if (!rest.startsWith("- [")) return esc(line);
+      if (rest.startsWith("label ")) {
+        const m = rest.match(/^label\s+\"(.*)\":$/);
+        const label = m ? m[1] : rest;
+        return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<a id="label-${encodeURIComponent(label)}"></a><span style="color:seagreen">${esc(rest)}</span>`;
+      }
+      if (rest.startsWith("goto(")) {
+        const m = rest.match(/^goto\(\"(.*)\"\)$/);
+        const label = m ? m[1] : "";
+        return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<a href="#label-${encodeURIComponent(label)}" style="color:royalblue">${esc(rest)}</a>`;
+      }
+      if (!rest.startsWith("- ["))
+        return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<span style="color:teal">${esc(rest)}</span>`;
       return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<span style="color:black">-</span> <span style="color:teal">${esc(rest.slice(2))}</span>`;
     })
     .join("\n");
@@ -432,7 +487,6 @@ async function extractMap(mapPath, outDir, allCommandIds) {
           trigger: page.trigger,
           triggerName: TRIGGER_NAMES[page.trigger] ?? "Unknown",
           conditions: page.conditions,
-          fullPage: page,
           interpreterCommandIds: allCommandIds,
         }),
         "",
@@ -473,7 +527,7 @@ async function mergeMap(mapFolder, outMapPath) {
         pages: [],
       });
     const ev = eventsById.get(id);
-    const page = h.fullPage;
+    const page = h.fullPage ?? { conditions: h.conditions ?? {}, list: [] };
     page.list = list;
     ev.pages[h.pageIndex] = page;
   }
