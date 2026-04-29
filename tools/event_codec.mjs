@@ -130,13 +130,37 @@ const labelForCommand = (c) =>
   (PRETTY_LABELS[c.code]
     ? PRETTY_LABELS[c.code](c.parameters)
     : `Command ${c.code}`) || "";
-const serializeEventCommands = (commands) =>
-  commands.map((c) => {
+function serializeEventCommands(commands) {
+  const out = [];
+  for (let i = 0; i < commands.length; i++) {
+    const c = commands[i];
     const tabs = "\t".repeat(c.indent);
+    if (c.code === 0) {
+      out.push("");
+      continue;
+    }
+    if (c.code === 355) {
+      const scriptLines = [String(c.parameters?.[0] ?? "")];
+      let j = i + 1;
+      while (j < commands.length && commands[j].code === 655) {
+        scriptLines.push(String(commands[j].parameters?.[0] ?? ""));
+        j++;
+      }
+      i = j - 1;
+      out.push(`${tabs}eval("""`);
+      for (const line of scriptLines) out.push(`${tabs}${line}`);
+      out.push(`${tabs}""")`);
+      continue;
+    }
     const rendered = renderPythonLikeCommand(c);
-    if (rendered) return `${tabs}${rendered}`;
-    return `${tabs}- [${c.code}] ${labelForCommand(c)} | ${JSON.stringify(c.parameters)}`;
-  });
+    if (rendered) out.push(`${tabs}${rendered}`);
+    else
+      out.push(
+        `${tabs}- [${c.code}] ${labelForCommand(c)} | ${JSON.stringify(c.parameters)}`,
+      );
+  }
+  return out;
+}
 
 function renderPythonLikeCommand(c) {
   if (c.code === 108) return `# ${String(c.parameters?.[0] ?? "")}`;
@@ -158,7 +182,7 @@ function renderPythonLikeCommand(c) {
   if (c.code === 231) return renderShowPicture(c.parameters);
   if (c.code === 232) return renderMovePicture(c.parameters);
   if (c.code === 235) return `erasePicture(${Number(c.parameters?.[0] ?? 0)})`;
-  if (c.code === 101) return `beginText(${JSON.stringify(c.parameters ?? [])})`;
+  if (c.code === 101) return renderBeginText(c.parameters);
   if (c.code === 401)
     return `text(${JSON.stringify(String(c.parameters?.[0] ?? ""))})`;
   if (c.code === 102)
@@ -167,9 +191,10 @@ function renderPythonLikeCommand(c) {
     return `SelfSwitch[${String(c.parameters?.[0] ?? "A")}] = ${Number(c.parameters?.[1] ?? 0) === 0 ? "ON" : "OFF"}`;
   if (c.code === 250)
     return `playSE(${JSON.stringify(c.parameters?.[0] ?? {})})`;
-  if (c.code === 355)
-    return `eval(${JSON.stringify(String(c.parameters?.[0] ?? ""))})`;
+  if (c.code === 221) return "fadeoutScreen()";
+  if (c.code === 222) return "fadeinScreen()";
   if (c.code === 356) return renderPluginCommand(c.parameters);
+  if (c.code === 126) return renderChangeItems(c.parameters);
   if (c.code === 117) return renderCommonEventCall(c.parameters);
   if (c.code === 121) return renderControlSwitch(c.parameters);
   if (c.code === 122) return renderControlVariable(c.parameters);
@@ -194,10 +219,25 @@ function renderShowPicture(p) {
   return `showPicture(id=${id}, name=${JSON.stringify(name)}, origin=${origin}, x=${x}, y=${y}, scaleX=${sx}, scaleY=${sy}, opacity=${opacity}, blend=${blend})`;
 }
 
+function renderBeginText(p) {
+  const [faceName, faceIndex, bg, pos] = p ?? [];
+  return `beginText(face=${JSON.stringify(faceName)}, faceIndex=${faceIndex}, background=${bg}, position=${pos})`;
+}
+
 function renderMovePicture(p) {
   const [id, origin, , , x, y, sx, sy, opacity, blend, duration, wait] =
     p ?? [];
   return `movePicture(id=${id}, origin=${origin}, x=${x}, y=${y}, scaleX=${sx}, scaleY=${sy}, opacity=${opacity}, blend=${blend}, duration=${duration}, wait=${Boolean(wait)})`;
+}
+
+function renderChangeItems(p) {
+  const [itemId, opType, operandType, value] = p ?? [];
+  const op = Number(opType) === 0 ? "+=" : "-=";
+  const rhs =
+    Number(operandType) === 0
+      ? String(value ?? 0)
+      : `Variable[${String(Number(value ?? 0)).padStart(4, "0")}]`;
+  return `Items[${Number(itemId ?? 0)}] ${op} ${rhs}`;
 }
 
 function renderTransferPlayer(p) {
@@ -340,6 +380,15 @@ function readHeader(lines) {
 function toHtml(lines) {
   const esc = (s) =>
     s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const colorize = (s) => {
+    let out = esc(s);
+    out = out.replace(
+      /(\"(?:[^\"\\\\]|\\\\.)*\")/g,
+      '<span style="color:#2e8b57">$1</span>',
+    );
+    out = out.replace(/\b(\d+)\b/g, '<span style="color:#b8860b">$1</span>');
+    return out;
+  };
   const body = lines
     .map((line) => {
       if (line.startsWith("#%"))
@@ -349,16 +398,16 @@ function toHtml(lines) {
       if (rest.startsWith("label ")) {
         const m = rest.match(/^label\s+\"(.*)\":$/);
         const label = m ? m[1] : rest;
-        return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<a id="label-${encodeURIComponent(label)}"></a><span style="color:seagreen">${esc(rest)}</span>`;
+        return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<a id="label-${encodeURIComponent(label)}"></a><span style="color:seagreen">${colorize(rest)}</span>`;
       }
       if (rest.startsWith("goto(")) {
         const m = rest.match(/^goto\(\"(.*)\"\)$/);
         const label = m ? m[1] : "";
-        return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<a href="#label-${encodeURIComponent(label)}" style="color:royalblue">${esc(rest)}</a>`;
+        return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<a href="#label-${encodeURIComponent(label)}" style="color:royalblue">${colorize(rest)}</a>`;
       }
       if (!rest.startsWith("- ["))
-        return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<span style="color:teal">${esc(rest)}</span>`;
-      return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<span style="color:black">-</span> <span style="color:teal">${esc(rest.slice(2))}</span>`;
+        return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<span style="color:teal">${colorize(rest)}</span>`;
+      return `${"&nbsp;&nbsp;&nbsp;&nbsp;".repeat(tabs)}<span style="color:black">-</span> <span style="color:teal">${colorize(rest.slice(2))}</span>`;
     })
     .join("\n");
   return `<pre>${body}</pre>`;
