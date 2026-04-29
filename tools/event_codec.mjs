@@ -168,6 +168,98 @@ function toHtml(lines) {
     .join("\n");
   return `<pre>${body}</pre>`;
 }
+
+function escapeHtml(s) {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+async function renderEventCodeHtml(filePath) {
+  const lines = (await readText(filePath)).split(/\r?\n/);
+  return toHtml(lines);
+}
+
+async function buildMapPickerHtml(mapPath, mapFolder) {
+  const map = JSON.parse(await readText(mapPath));
+  const width = Number(map.width ?? 0);
+  const height = Number(map.height ?? 0);
+  const mapName = map.displayName || map.note || "(unnamed map)";
+  const events = (map.events ?? []).filter(Boolean);
+
+  const grouped = new Map();
+  for (const ev of events) {
+    const key = `${ev.x},${ev.y}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(ev);
+  }
+
+  const rows = [];
+  for (let y = 0; y < height; y++) {
+    const cells = [];
+    for (let x = 0; x < width; x++) {
+      const key = `${x},${y}`;
+      const list = grouped.get(key) ?? [];
+      const has = list.length > 0;
+      const label = has ? String(list.length) : "";
+      const title = has
+        ? list.map((e) => `#${e.id} ${e.name}`).join(" | ")
+        : "";
+      const data = JSON.stringify(
+        list.map((e) => ({ id: e.id, name: e.name, pages: e.pages.length })),
+      );
+      cells.push(
+        `<td class="tile ${has ? "has-event" : ""}" data-events="${escapeHtml(data)}" title="${escapeHtml(title)}">${label}</td>`,
+      );
+    }
+    rows.push(`<tr>${cells.join("")}</tr>`);
+  }
+
+  const eventHtmlById = {};
+  for (const ev of events) {
+    const pages = [];
+    for (let pageNo = 1; pageNo <= ev.pages.length; pageNo++) {
+      const filePath = `${mapFolder}/event${String(ev.id).padStart(3, "0")}_page${String(pageNo).padStart(2, "0")}.evt.txt`;
+      pages.push({ page: pageNo, html: await renderEventCodeHtml(filePath) });
+    }
+    eventHtmlById[ev.id] = pages;
+  }
+
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Map Picker</title>
+<style>
+body{font-family:Arial,sans-serif}table{border-collapse:collapse}td.tile{width:22px;height:22px;border:1px solid #ddd;text-align:center;font-size:11px}
+.has-event{background:#ffefc2;cursor:pointer;font-weight:bold}#overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none}
+#popup{position:fixed;left:5%;top:5%;width:90%;height:90%;background:#fff;border:1px solid #333;display:none;overflow:auto;padding:8px}
+.tabs button{margin-right:4px}.eventTab{display:none}.eventTab.active{display:block}
+</style></head><body>
+<h2>${escapeHtml(mapName)} (${width}x${height})</h2>
+<p>Click highlighted tiles to inspect events.</p>
+<table>${rows.join("\n")}</table>
+<div id="overlay"></div><div id="popup"><button onclick="closePopup()">Close</button><div id="content"></div></div>
+<script>
+const eventHtmlById = ${JSON.stringify(eventHtmlById)};
+const overlay=document.getElementById('overlay'); const popup=document.getElementById('popup');
+function closePopup(){overlay.style.display='none';popup.style.display='none';}
+function openEvent(i){document.querySelectorAll('.eventTab').forEach((e,idx)=>e.classList.toggle('active',idx===i));}
+function openPage(ei,pi){document.querySelectorAll('#ev_'+ei+' .page').forEach((e,idx)=>e.style.display=idx===pi?'block':'none');}
+function showEventTabs(events){
+  const content=document.getElementById('content');
+  let out='<div class="tabs">';
+  events.forEach((e,i)=>{out+='<button onclick="openEvent('+i+')">#'+e.id+' '+e.name+'</button>';});
+  out+='</div>';
+  events.forEach((e,i)=>{out+='<div class="eventTab" id="ev_'+i+'"><h3>Event #'+e.id+' '+e.name+'</h3>';
+    const pages=eventHtmlById[e.id]||[];
+    out+='<div class="tabs">'+pages.map((p,pi)=>'<button onclick="openPage('+i+','+pi+')">Page '+p.page+'</button>').join('')+'</div>';
+    pages.forEach((p,pi)=>{out+='<div class="page" style="display:'+(pi===0?'block':'none')+'">'+p.html+'</div>';});
+    out+='</div>';});
+  content.innerHTML=out; openEvent(0); overlay.style.display='block'; popup.style.display='block';
+}
+document.querySelectorAll('td.has-event').forEach((td)=>td.addEventListener('click',()=>showEventTabs(JSON.parse(td.dataset.events))));
+</script></body></html>`;
+  await writeText(`${mapFolder}/picker.html`, html);
+}
 async function writeEventFiles(basePath, lines) {
   await writeText(`${basePath}.evt.txt`, `${lines.join("\n")}\n`);
   await writeText(`${basePath}.evt.html`, toHtml(lines));
@@ -210,6 +302,7 @@ async function extractMap(mapPath, outDir, allCommandIds) {
       await writeEventFiles(basePath, lines);
     }
   }
+  await buildMapPickerHtml(mapPath, mapFolder);
 }
 
 async function mergeMap(mapFolder, outMapPath) {
