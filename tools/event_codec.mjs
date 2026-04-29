@@ -279,8 +279,8 @@ function renderControlVariable(p) {
   const [start, end, op, operandType] = p ?? [];
   const target =
     Number(start) === Number(end)
-      ? `ControlVariable[${Number(start)}]`
-      : `ControlVariable[${Number(start)}:${Number(end)}]`;
+      ? `Variables[${Number(start)}]`
+      : `Variables[${Number(start)}:${Number(end)}]`;
   const operator = ["=", "+=", "-=", "*=", "/=", "%="][Number(op) ?? 0] ?? "=";
   let rhs = "0";
   if (Number(operandType) === 0) rhs = String(p?.[4] ?? 0);
