@@ -66,6 +66,17 @@ function getArgs() {
   if (isNode || isBun) return process.argv.slice(2);
   return [];
 }
+function parseCliArgs(argv) {
+  const flags = {
+    useMetadata: true,
+  };
+  const args = [];
+  for (const a of argv) {
+    if (a === "--no-metadata") flags.useMetadata = false;
+    else args.push(a);
+  }
+  return { flags, args };
+}
 async function readText(filePath) {
   if (isDeno) return await Deno.readTextFile(filePath);
   const fs = await import("node:fs/promises");
@@ -164,6 +175,7 @@ function serializeEventCommands(commands) {
 
 function renderPythonLikeCommand(c) {
   if (c.code === 108) return `# ${String(c.parameters?.[0] ?? "")}`;
+  if (c.code === 408) return `# ${String(c.parameters?.[0] ?? "")}`;
   if (c.code === 118)
     return `label ${JSON.stringify(String(c.parameters?.[0] ?? ""))}:`;
   if (c.code === 119)
@@ -236,7 +248,7 @@ function renderChangeItems(p) {
   const rhs =
     Number(operandType) === 0
       ? String(value ?? 0)
-      : `Variable[${String(Number(value ?? 0)).padStart(4, "0")}]`;
+      : `Variable[${Number(value ?? 0)}]`;
   return `Items[${Number(itemId ?? 0)}] ${op} ${rhs}`;
 }
 
@@ -258,8 +270,8 @@ function renderControlSwitch(p) {
   const [start, end, value] = p ?? [];
   const target =
     Number(start) === Number(end)
-      ? `ControlSwitch[${String(Number(start)).padStart(4, "0")}]`
-      : `ControlSwitch[${String(Number(start)).padStart(4, "0")}:${String(Number(end)).padStart(4, "0")}]`;
+      ? `ControlSwitch[${Number(start)}]`
+      : `ControlSwitch[${Number(start)}:${Number(end)}]`;
   return `${target} = ${Number(value) === 0 ? "ON" : "OFF"}`;
 }
 
@@ -267,13 +279,12 @@ function renderControlVariable(p) {
   const [start, end, op, operandType] = p ?? [];
   const target =
     Number(start) === Number(end)
-      ? `ControlVariable[${String(Number(start)).padStart(4, "0")}]`
-      : `ControlVariable[${String(Number(start)).padStart(4, "0")}:${String(Number(end)).padStart(4, "0")}]`;
+      ? `ControlVariable[${Number(start)}]`
+      : `ControlVariable[${Number(start)}:${Number(end)}]`;
   const operator = ["=", "+=", "-=", "*=", "/=", "%="][Number(op) ?? 0] ?? "=";
   let rhs = "0";
   if (Number(operandType) === 0) rhs = String(p?.[4] ?? 0);
-  else if (Number(operandType) === 1)
-    rhs = `Variable[${String(Number(p?.[4] ?? 0)).padStart(4, "0")}]`;
+  else if (Number(operandType) === 1) rhs = `Variable[${Number(p?.[4] ?? 0)}]`;
   else if (Number(operandType) === 2)
     rhs = `random(${p?.[4] ?? 0}, ${p?.[5] ?? 0})`;
   else if (Number(operandType) === 3)
@@ -288,7 +299,7 @@ function decodeIfCondition(params) {
   if (t === 0) {
     const id = Number(params[1] ?? 0);
     const on = Number(params[2] ?? 0) === 0;
-    return `Switch[${String(id).padStart(4, "0")}] == ${on ? "ON" : "OFF"}`;
+    return `Switch[${id}] == ${on ? "ON" : "OFF"}`;
   }
   if (t === 1) {
     const id = Number(params[1] ?? 0);
@@ -298,8 +309,8 @@ function decodeIfCondition(params) {
     const rhs =
       rhsType === 0
         ? String(params[3] ?? 0)
-        : `Variable[${String(Number(params[3] ?? 0)).padStart(4, "0")}]`;
-    return `Variable[${String(id).padStart(4, "0")}] ${op} ${rhs}`;
+        : `Variable[${Number(params[3] ?? 0)}]`;
+    return `Variable[${id}] ${op} ${rhs}`;
   }
   if (t === 2) {
     const ch = String(params[1] ?? "A");
@@ -631,9 +642,12 @@ async function listCommands() {
     );
 }
 
-const [mode, ...args] = getArgs();
+const parsed = parseCliArgs(getArgs());
+const [mode, ...args] = parsed.args;
 const allCommandIds = await loadInterpreterCommandIds();
-await loadCommonEventNames();
+if (parsed.flags.useMetadata) {
+  await loadCommonEventNames();
+}
 if (mode === "list-commands") await listCommands();
 else if (mode === "extract-map")
   await extractMap(args[0], args[1] ?? "out_events", allCommandIds);
