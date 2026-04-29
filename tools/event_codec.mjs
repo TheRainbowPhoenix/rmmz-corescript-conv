@@ -288,10 +288,70 @@ function renderControlVariable(p) {
   else if (Number(operandType) === 2)
     rhs = `random(${p?.[4] ?? 0}, ${p?.[5] ?? 0})`;
   else if (Number(operandType) === 3)
-    rhs = `GameData(${JSON.stringify(p?.slice(4) ?? [])})`;
+    rhs = renderGameDataOperand(p?.slice(4) ?? []);
   else if (Number(operandType) === 4)
     rhs = `Script(${JSON.stringify(String(p?.[4] ?? ""))})`;
   return `${target} ${operator} ${rhs}`;
+}
+
+function renderGameDataOperand(raw) {
+  const [kind, a, b] = raw.map((v) => Number(v));
+  if (kind === 0) return `Items[${a}].count`;
+  if (kind === 1) return `Weapons[${a}].count`;
+  if (kind === 2) return `Armors[${a}].count`;
+  if (kind === 3) {
+    const actorParam = [
+      "Level",
+      "EXP",
+      "HP",
+      "MP",
+      "MHP",
+      "MMP",
+      "Atk",
+      "Def",
+      "MAtk",
+      "MDef",
+      "Agility",
+      "Luck",
+    ];
+    return `Actors[${a}].${actorParam[b] ?? `Param${b}`}`;
+  }
+  if (kind === 4) {
+    const enemyParam = [
+      "Level",
+      "EXP",
+      "HP",
+      "MP",
+      "MHP",
+      "MMP",
+      "Atk",
+      "Def",
+      "MAtk",
+      "MDef",
+      "Agility",
+      "Luck",
+    ];
+    return `Enemies[${a}].${enemyParam[b] ?? `Param${b}`}`;
+  }
+  if (kind === 5)
+    return `Characters[${a}].${["MapX", "MapY", "Direction", "ScreenX", "ScreenY"][b] ?? `Param${b}`}`;
+  if (kind === 6) return `Party[${a}]`;
+  if (kind === 7) {
+    const other = [
+      "mapId",
+      "partyMember",
+      "gold",
+      "steps",
+      "playTime",
+      "timer",
+      "saveCount",
+      "battleCount",
+      "winCount",
+      "escapeCount",
+    ];
+    return `Other.${other[a] ?? `Value${a}`}`;
+  }
+  return `GameData(${JSON.stringify(raw)})`;
 }
 
 function decodeIfCondition(params) {
