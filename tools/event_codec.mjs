@@ -60,6 +60,8 @@ const PRETTY_LABELS = {
   655: (p) => `Script (cont.): ${String(p[0] ?? "")}`,
 };
 let commonEventNameById = new Map();
+let switchNames = [];
+let variableNames = [];
 
 function getArgs() {
   if (isDeno) return [...globalThis.Deno.args];
@@ -137,6 +139,24 @@ async function loadCommonEventNames() {
     return;
   }
 }
+async function loadSystemNames() {
+  const candidates = ["data/System.json", "test/data/System.json"];
+  for (const filePath of candidates) {
+    if (!(await exists(filePath))) continue;
+    const sys = JSON.parse(await readText(filePath));
+    switchNames = sys.switches ?? [];
+    variableNames = sys.variables ?? [];
+    return;
+  }
+}
+function switchComment(id) {
+  const name = String(switchNames?.[id] ?? "").trim();
+  return name ? `  # ${name}` : "";
+}
+function variableComment(id) {
+  const name = String(variableNames?.[id] ?? "").trim();
+  return name ? `  # ${name}` : "";
+}
 const labelForCommand = (c) =>
   (PRETTY_LABELS[c.code]
     ? PRETTY_LABELS[c.code](c.parameters)
@@ -207,6 +227,8 @@ function renderPythonLikeCommand(c) {
   if (c.code === 222) return "fadeinScreen()";
   if (c.code === 356) return renderPluginCommand(c.parameters);
   if (c.code === 126) return renderChangeItems(c.parameters);
+  if (c.code === 127) return renderChangeWeapons(c.parameters);
+  if (c.code === 319) return renderChangeEquip(c.parameters);
   if (c.code === 117) return renderCommonEventCall(c.parameters);
   if (c.code === 121) return renderControlSwitch(c.parameters);
   if (c.code === 122) return renderControlVariable(c.parameters);
@@ -251,6 +273,19 @@ function renderChangeItems(p) {
       : `Variable[${Number(value ?? 0)}]`;
   return `Items[${Number(itemId ?? 0)}] ${op} ${rhs}`;
 }
+function renderChangeWeapons(p) {
+  const [weaponId, opType, operandType, value, includeEquip] = p ?? [];
+  const op = Number(opType) === 0 ? "+=" : "-=";
+  const rhs =
+    Number(operandType) === 0
+      ? String(value ?? 0)
+      : `Variables[${Number(value ?? 0)}]`;
+  return `Weapons[${Number(weaponId ?? 0)}] ${op} ${rhs}${includeEquip ? "  # include equipped" : ""}`;
+}
+function renderChangeEquip(p) {
+  const [actorId, slotType, itemId] = p ?? [];
+  return `changeEquip(actor=${actorId}, slot=${slotType}, item=${itemId})`;
+}
 
 function renderTransferPlayer(p) {
   const [mode, mapId, x, y, dir, fade] = p ?? [];
@@ -272,7 +307,7 @@ function renderControlSwitch(p) {
     Number(start) === Number(end)
       ? `ControlSwitch[${Number(start)}]`
       : `ControlSwitch[${Number(start)}:${Number(end)}]`;
-  return `${target} = ${Number(value) === 0 ? "ON" : "OFF"}`;
+  return `${target} = ${Number(value) === 0 ? "ON" : "OFF"}${Number(start) === Number(end) ? switchComment(Number(start)) : ""}`;
 }
 
 function renderControlVariable(p) {
@@ -291,7 +326,7 @@ function renderControlVariable(p) {
     rhs = renderGameDataOperand(p?.slice(4) ?? []);
   else if (Number(operandType) === 4)
     rhs = `Script(${JSON.stringify(String(p?.[4] ?? ""))})`;
-  return `${target} ${operator} ${rhs}`;
+  return `${target} ${operator} ${rhs}${Number(start) === Number(end) ? variableComment(Number(start)) : ""}`;
 }
 
 function renderGameDataOperand(raw) {
@@ -359,7 +394,7 @@ function decodeIfCondition(params) {
   if (t === 0) {
     const id = Number(params[1] ?? 0);
     const on = Number(params[2] ?? 0) === 0;
-    return `Switch[${id}] == ${on ? "ON" : "OFF"}`;
+    return `Switch[${id}] == ${on ? "ON" : "OFF"}${switchComment(id)}`;
   }
   if (t === 1) {
     const id = Number(params[1] ?? 0);
@@ -370,7 +405,7 @@ function decodeIfCondition(params) {
       rhsType === 0
         ? String(params[3] ?? 0)
         : `Variable[${Number(params[3] ?? 0)}]`;
-    return `Variable[${id}] ${op} ${rhs}`;
+    return `Variable[${id}] ${op} ${rhs}${variableComment(id)}`;
   }
   if (t === 2) {
     const ch = String(params[1] ?? "A");
@@ -405,9 +440,9 @@ function decodeIfCondition(params) {
     return `Gold ${["<=", ">=", "<", ">", "=="][Number(params[2] ?? 0)] ?? ">="} ${Number(params[1] ?? 0)}`;
   if (t === 8) return `Item[${Number(params[1] ?? 0)}] == owned`;
   if (t === 9)
-    return `Weapon[${Number(params[1] ?? 0)}]${Number(params[2] ?? 0) ? ".withEquipment" : ""} == owned`;
+    return `partyHas(Weapon[${Number(params[1] ?? 0)}], includeEquipped=${Number(params[2] ?? 0) ? "True" : "False"})`;
   if (t === 10)
-    return `Armor[${Number(params[1] ?? 0)}]${Number(params[2] ?? 0) ? ".withEquipment" : ""} == owned`;
+    return `partyHas(Armor[${Number(params[1] ?? 0)}], includeEquipped=${Number(params[2] ?? 0) ? "True" : "False"})`;
   if (t === 11)
     return `Button[${JSON.stringify(String(params[1] ?? ""))}] == pressed`;
   if (t === 12) return `Script(${JSON.stringify(String(params[1] ?? ""))})`;
@@ -707,6 +742,7 @@ const [mode, ...args] = parsed.args;
 const allCommandIds = await loadInterpreterCommandIds();
 if (parsed.flags.useMetadata) {
   await loadCommonEventNames();
+  await loadSystemNames();
 }
 if (mode === "list-commands") await listCommands();
 else if (mode === "extract-map")
